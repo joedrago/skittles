@@ -79,7 +79,9 @@ class Skittles {
         }
 
         this.config = CSON.parse(fs.readFileSync(this.configFilename))
-        console.log(this.config)
+        if (this.config instanceof Error) {
+            fatal(this.config.stack)
+        }
 
         if (!this.config.discordBotToken) {
             return fatal(`Config missing "discordBotToken": ${this.configFilename}`)

@@ -28,6 +28,15 @@ actions: [
   }
 
   {
+    description: "TikTokAnonymous - Anonymize a TikTok URL"
+    triggers: [
+      "#tta\\b(.*)"
+    ]
+    mod: "tta"
+    key: "tta"
+  }
+
+  {
     description: "TwitterDownload - Download a Twitter Video right into Discord"
     triggers: [
       "\#td\\b(.*)"
