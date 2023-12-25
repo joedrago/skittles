@@ -29,10 +29,17 @@ const randomString = () => {
 }
 
 const watch = (filename) => {
-    fs.watch(filename, { persistent: false, recursive: true }, (eventType, filename) => {
+    fs.watch(filename, { persistent: false }, (eventType, filename) => {
         console.log(`[${eventType}] ${filename} -> restarting...`)
         process.exit(1)
     })
+}
+
+const watchAll = (dir) => {
+    const filenames = fs.readdirSync(dir)
+    for (const filename of filenames) {
+        watch(path.join(dir, filename))
+    }
 }
 
 class Skittles {
@@ -56,8 +63,8 @@ class Skittles {
         }
 
         // Watch for changes, so forever can restart the script
-        watch(path.join(__dirname, "..", "src"))
-        watch(path.join(__dirname, "..", "mods"))
+        watchAll(path.join(__dirname, "..", "src"))
+        watchAll(path.join(__dirname, "..", "mods"))
         watch(configFilename)
 
         // Make an empty, fresh tempdir
