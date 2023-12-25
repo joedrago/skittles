@@ -19,6 +19,17 @@ actions: [
   # Major functionality
 
   {
+    description: "List commands"
+    triggers: [
+      "#commands\\b"
+    ]
+    mod: "commands"
+    key: "commands"
+    file: "out.html"
+    url: "https://example.com/where/out.html/is/hosted/"
+  }
+
+  {
     description: "TikTokDownload - Download a TikTok URL right into Discord"
     triggers: [
       "\#ttd\\b(.*)"

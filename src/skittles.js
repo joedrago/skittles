@@ -162,6 +162,29 @@ class Skittles {
         // console.log(`Replacement: ${replacement}`)
     }
 
+    commands() {
+        let cmds = []
+        for (const action of this.actions) {
+            for (const trigger of action.triggers) {
+                if (!action.noop && trigger.indexOf("#") != -1) {
+                    let sanitizedTrigger = trigger.replace(/\\b/g, "")
+                    sanitizedTrigger = sanitizedTrigger.replace(/\(\.\*\)/g, "")
+                    cmds.push([sanitizedTrigger, action.description])
+                }
+            }
+        }
+        cmds.sort((a, b) => {
+            if (a[0] < b[0]) {
+                return -1
+            }
+            if (a[0] > b[0]) {
+                return 1
+            }
+            return 0
+        })
+        return cmds
+    }
+
     async replaceAll(matches, text) {
         const regex = /!([^!]+)!/g
         const promises = []
@@ -192,6 +215,7 @@ class Skittles {
             for (const trigger of action.triggers) {
                 const capture = req.raw.match(trigger)
                 if (capture) {
+                    req.action = action
                     console.log(`matched: ${action.description}`)
                     if (action.noop) {
                         // Do nothing!
@@ -256,6 +280,9 @@ const modFiles = (modName) => {
 const tempFile = (...args) => {
     return instance_.tempFile(...args)
 }
+const commands = (...args) => {
+    return instance_.commands(...args)
+}
 
 const init = (...args) => {
     instance_.init(...args)
@@ -272,5 +299,6 @@ module.exports = {
     addReplacement,
     modFiles,
     tempFile,
+    commands,
     init
 }
