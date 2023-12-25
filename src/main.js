@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
-const { main } = require("./skittles")
+const { init } = require("./skittles")
+const path = require("path")
 
-main(process.argv.slice(2))
+init(path.join(__dirname, "..", "skittles.config"))

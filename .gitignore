@@ -1,2 +1,6 @@
 /node_modules
 /package-lock.json
+/skittles.config
+/skittles.temp
+
+/mods/madlibs

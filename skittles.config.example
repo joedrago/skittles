@@ -1,0 +1,73 @@
+# Secrets
+discordBotToken: "YOUR_BOT_TOKEN"
+
+actions: [
+
+  # -----------------------------------------------------------------------------------------------
+  # Basic No-op functionality
+
+  {
+    description: "Do nothing if a hashtag is in a code block or for another bot"
+    triggers: [
+      "`#"
+      "#sd\\b"
+    ]
+    noop: true
+  }
+
+  # -----------------------------------------------------------------------------------------------
+  # Major functionality
+
+  {
+    description: "TikTokDownload - Download a TikTok URL right into Discord"
+    triggers: [
+      "\#ttd\\b(.*)"
+    ]
+    mod: "video"
+    key: "ttd"
+  }
+
+  {
+    description: "TwitterDownload - Download a Twitter Video right into Discord"
+    triggers: [
+      "\#td\\b(.*)"
+    ]
+    mod: "video"
+    key: "td"
+  }
+
+  {
+    description: "GIF - Turn a youtube clip into a GIF: #gif [url] [startSeconds] [durationSeconds]"
+    triggers: [
+      "\#gif\\b(.*)"
+    ]
+    mod: "gif"
+    key: "gif"
+  }
+
+  # -----------------------------------------------------------------------------------------------
+  # Minor triggers
+
+  {
+    description: "Makes up a video game name when someone says video games"
+    triggers: [
+      "video game"
+      "#videogame\\b"
+    ]
+    replies: [
+      "That game will never be as good as \"!ML_VIDEO1! !ML_VIDEO2! !ML_VIDEO3!\""
+    ]
+  }
+
+  {
+    description: "Flips a coin"
+    triggers: [
+      "#coin"
+      "#toss"
+      "#flip"
+    ]
+    replies: [
+      "!ML_COIN!"
+    ]
+  }
+]
