@@ -44,8 +44,7 @@ const randomGoogleImage = async (req, key, capture) => {
 const compositeImage = async (req, key, capture) => {
     const compositeFilename = req.action.compositeFilename
     if (!compositeFilename) {
-        resolve({ error: "compositeImage is misconfigured, sorry." })
-        return
+        return req.reply({ text: "ERROR: compositeImage is misconfigured, sorry." })
     }
 
     // Find some image URLs
