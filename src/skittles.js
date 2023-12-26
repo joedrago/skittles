@@ -3,7 +3,7 @@ const fs = require("fs")
 const http = require("http")
 const https = require("https")
 const path = require("path")
-const CSON = require("cson")
+const TOML = require("toml")
 const childProcessSpawn = require("child_process").spawn
 
 const TEMP_FILE_CLEANUP_MS = 10 * 60 * 1000 // 10 minutes
@@ -87,7 +87,7 @@ class Skittles {
             }
         }
 
-        this.config = CSON.parse(fs.readFileSync(this.configFilename))
+        this.config = TOML.parse(fs.readFileSync(this.configFilename))
         if (this.config instanceof Error) {
             fatal(this.config.stack)
         }

@@ -3,4 +3,4 @@
 const { init } = require("./skittles")
 const path = require("path")
 
-init(path.join(__dirname, "..", "skittles.config"))
+init(path.join(__dirname, "..", "skittles.toml"))
