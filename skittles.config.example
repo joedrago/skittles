@@ -1,6 +1,10 @@
 # Secrets
 discordBotToken: "YOUR_BOT_TOKEN"
 
+# Google Image Custom Search (image mod)
+googleImageSearch_cx:  "YOUR_CX"
+googleImageSearch_key: "YOUR_KEY"
+
 actions: [
 
   # -----------------------------------------------------------------------------------------------
@@ -63,6 +67,15 @@ actions: [
     ]
     mod: "gif"
     key: "gif"
+  }
+
+  {
+    description: "Lookup an image on Google"
+    triggers: [
+      "#image\\b(.*)"
+    ]
+    mod: "image"
+    key: "image"
   }
 
   # -----------------------------------------------------------------------------------------------

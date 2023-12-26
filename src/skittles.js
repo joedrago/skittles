@@ -1,5 +1,7 @@
 const DiscordBot = require("./DiscordBot")
 const fs = require("fs")
+const http = require("http")
+const https = require("https")
 const path = require("path")
 const CSON = require("cson")
 const childProcessSpawn = require("child_process").spawn
@@ -161,6 +163,54 @@ class Skittles {
         }
     }
 
+    async tempDownload(url) {
+        return new Promise((resolve, reject) => {
+            const proto = !url.charAt(4).localeCompare("s") ? https : http
+
+            let parsedURL = null
+            let parsed = null
+            try {
+                parsedURL = new URL(url)
+                parsed = path.parse(parsedURL.pathname)
+            } catch (e) {
+                return resolve({ error: `Not a valid URL: ${url}` })
+            }
+            const ext = parsed.ext.substr(1)
+            if (!ext.length) {
+                return resolve({ error: `Couldn't detect extension: ${url}` })
+            }
+
+            const tempFilename = this.tempFile(ext)
+            const req = proto.request(
+                url,
+                {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                },
+                (res) => {
+                    if (res.statusCode !== 200) {
+                        resolve({ error: `Failed to get \`${url}\` (${res.statusCode})` })
+                        return
+                    }
+
+                    const file = fs.createWriteStream(tempFilename)
+                    res.pipe(file)
+
+                    file.on("finish", () => {
+                        resolve({ filename: tempFilename })
+                    })
+                }
+            )
+            console.log(`Downloading: ${url} => ${tempFilename}`)
+            req.on("error", (e) => {
+                resolve({ error: e })
+            })
+            req.end()
+        })
+    }
+
     addReplacement(replacement, func) {
         this.replacements[replacement] = {
             replacement: replacement,
@@ -284,11 +334,55 @@ const modFiles = (modName) => {
     return files
 }
 
+const jsonRequest = (url, postdata = null) => {
+    return new Promise((resolve, reject) => {
+        const method = postdata ? "POST" : "GET"
+        const req = https.request(
+            url,
+            {
+                method: method,
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            },
+            (res) => {
+                let raw = ""
+                res.on("data", (chunk) => {
+                    raw += chunk
+                })
+                res.on("end", () => {
+                    let data = null
+                    try {
+                        data = JSON.parse(raw)
+                    } catch (e) {
+                        data = null
+                    }
+                    resolve({ raw: raw, data: data })
+                })
+            }
+        )
+        if (postdata) {
+            req.write(JSON.stringify(postdata))
+        }
+        console.log(`Performing ${method} request: ${url}`)
+        req.on("error", (e) => {
+            resolve({ error: e })
+        })
+        req.end()
+    })
+}
+
 const tempFile = (...args) => {
     return instance_.tempFile(...args)
 }
+const tempDownload = (...args) => {
+    return instance_.tempDownload(...args)
+}
 const commands = (...args) => {
     return instance_.commands(...args)
+}
+const config = (...args) => {
+    return instance_.config
 }
 
 const init = (...args) => {
@@ -305,7 +399,10 @@ module.exports = {
     spawn,
     addReplacement,
     modFiles,
+    jsonRequest,
     tempFile,
+    tempDownload,
     commands,
+    config,
     init
 }

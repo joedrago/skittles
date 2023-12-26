@@ -77,8 +77,8 @@ const DiscordBot = class DiscordBot {
                 }
             }
 
-            let msgUploadTooBig = {
-                content: "Upload too big!",
+            let msgUploadError = {
+                content: "Upload error!",
                 allowedMentions: {
                     repliedUser: false
                 }
@@ -92,13 +92,15 @@ const DiscordBot = class DiscordBot {
                 try {
                     await req.discordMsg.reply(msgPayload)
                 } catch (e) {
-                    req.discordMsg.reply(msgUploadTooBig)
+                    console.log(`Upload error: ${e}`)
+                    req.discordMsg.reply(msgUploadError)
                 }
             } else {
                 try {
                     await req.discordMsg.channel.send(msgPayload)
                 } catch (e) {
-                    req.discordMsg.channel.send(msgUploadTooBig)
+                    console.log(`Upload error: ${e}`)
+                    req.discordMsg.channel.send(msgUploadError)
                 }
             }
         }

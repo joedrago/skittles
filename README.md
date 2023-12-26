@@ -1,6 +1,6 @@
 # Skittles
 
-## Installation
+## Bot Creation
 
 -   Visit: https://discord.com/developers/applications
 -   Choose: `New Application`, give it a name
@@ -14,3 +14,8 @@
     https://discord.com/api/oauth2/authorize?client_id=YOURAPPID&permissions=8&scope=bot
 
 -   Visit this link, choose your server, and grant the bot the appropriate privs for your server.
+
+## Installation
+
+-   `npm install`
+-   `NODE_OPTIONS="--max-old-space-size=8192" npm run start`
