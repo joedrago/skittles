@@ -54,6 +54,12 @@ triggers = [ "#image\\b(.*)" ]
 mod = "image"
 key = "image"
 
+[[actions]]
+description = "Generate a timestamp string for pasting into Discord"
+triggers = [ "#ts\\b(.*)", "#timestamp\\b(.*)" ]
+mod = "timestamp"
+key = "timestamp"
+
 # -----------------------------------------------------------------------------------------------
 # Madlibs triggers
 
