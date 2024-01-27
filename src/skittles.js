@@ -32,8 +32,10 @@ const randomString = () => {
 
 const watch = (filename) => {
     fs.watch(filename, { persistent: false }, (eventType, filename) => {
-        console.log(`[${eventType}] ${filename} -> restarting...`)
-        process.exit(1)
+        if (!filename.match(/\.swp$/)) {
+            console.log(`[${eventType}] ${filename} -> restarting...`)
+            process.exit(1)
+        }
     })
 }
 
@@ -319,6 +321,10 @@ const spawn = async (executable, args) => {
     })
 }
 
+const modFile = (modName, filename) => {
+    return path.join(__dirname, "..", "mods", modName, filename)
+}
+
 const modFiles = (modName) => {
     const modDir = path.join(__dirname, "..", "mods", modName)
     if (!fs.existsSync(modDir)) {
@@ -398,6 +404,7 @@ module.exports = {
 
     spawn,
     addReplacement,
+    modFile,
     modFiles,
     jsonRequest,
     tempFile,
