@@ -41,6 +41,9 @@ const request = async (req, key, capture) => {
     const shadow = req.action.shadow
 
     await image.resize(Jimp.AUTO, h)
+    if(image.bitmap.width < w) {
+        await image.resize(w, h)
+    }
     await image.crop(0, 0, w, h)
     if (caption.length > 0) {
         for(let iy = -1; iy <= 1; ++iy) {
