@@ -272,7 +272,7 @@ class Skittles {
 
         for (const action of this.actions) {
             for (const trigger of action.triggers) {
-                const capture = req.raw.match(trigger)
+                const capture = req.raw.match(new RegExp(trigger, "i"))
                 if (capture) {
                     req.action = action
                     console.log(`matched: ${action.description}`)
