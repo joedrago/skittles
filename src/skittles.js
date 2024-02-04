@@ -282,6 +282,9 @@ class Skittles {
                     }
                     const sayIt = Math.floor(Math.random() * 1000)
                     if (!action.chance || sayIt < action.chance) {
+                        if (action.suppressRequestEmbeds) {
+                            req.suppress()
+                        }
                         if (action.mod) {
                             const e = this.mods[action.mod]
                             if (e) {

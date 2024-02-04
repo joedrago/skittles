@@ -64,6 +64,14 @@ const DiscordBot = class DiscordBot {
                 }
             })
         }
+        req.suppress = function() {
+            if (req.discordMsg.inGuild()) {
+                console.log("Suppressing embeds...")
+                req.discordMsg.suppressEmbeds(true)
+            } else {
+                console.log("It's a DM, not suppressing embeds...")
+            }
+        }
         req.reply = async function (r) {
             if (!r.text) {
                 console.warn("DiscordBot: Ignoring reply with no .text field")
