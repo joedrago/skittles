@@ -280,6 +280,11 @@ class Skittles {
                         // Do nothing!
                         return
                     }
+                    if(action.dmonly && !req.dm) {
+                        // This action only works on DMs
+                        console.log("skipping ", action.description)
+                        continue
+                    }
                     const sayIt = Math.floor(Math.random() * 1000)
                     if (!action.chance || sayIt < action.chance) {
                         if (action.suppressRequestEmbeds) {
@@ -297,6 +302,9 @@ class Skittles {
                             let replacedText = await this.replaceAll(capture, text)
                             req.reply({ text: replacedText, reply: false })
                         }
+
+                        // Only respond with the first matched action
+                        return
                     }
                 }
             }

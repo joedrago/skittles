@@ -19,13 +19,24 @@ const request = async (req, key, capture) => {
             }
             break
         }
+        case "id": {
+            if (!url.match(/^https:\/\/([a-zA-Z0-9]+\.)?(instagram).com\/[^\?]+/)) {
+                return req.reply({ text: `Not an Instagram URL?: \`${url}\`` })
+            }
+            break
+        }
     }
 
     const downloadFilename = skittles.tempFile("mp4")
     const reencodeFilename = skittles.tempFile("mp4")
 
     console.log(`Downloading ${url} => ${downloadFilename}`)
-    const downloaded = await skittles.spawn("yt-dlp", ["--remux-video", "mp4", url, "-o", downloadFilename])
+    let args = ["--remux-video", "mp4", url, "-o", downloadFilename]
+    if(req.action.cookies) {
+        args.push("--cookies")
+        args.push(req.action.cookies)
+    }
+    const downloaded = await skittles.spawn("yt-dlp", args)
     if (!downloaded || !fs.existsSync(downloadFilename)) {
         return req.reply({ text: `Failed to download video: ${url}` })
     }

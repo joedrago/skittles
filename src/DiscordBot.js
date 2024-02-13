@@ -48,9 +48,11 @@ const DiscordBot = class DiscordBot {
         let raw = msg.content.trim()
         let req = {
             discordMsg: msg,
+            dm: !msg.inGuild(),
             raw: raw,
             ref: ref
         }
+
         if (msg.attachments != null) {
             msg.attachments.each(function (a) {
                 if (

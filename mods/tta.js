@@ -28,6 +28,11 @@ const request = async (req, key, capture) => {
         (res) => {
             let redirectedUrl = res.responseUrl.replace(/\?.+/, "")
             req.reply({ text: redirectedUrl })
+
+            if(key == "ttb") {
+                const video = require("./video")
+                video.request(req, "ttd", capture)
+            }
         }
     )
     httpsReq.on("error", (err) => {
