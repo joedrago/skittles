@@ -25,6 +25,16 @@ const DiscordBot = class DiscordBot {
         this.emitter.emit("ready", this.discordTag)
     }
 
+    async shout(guildSnowflake, channelSnowflake, text) {
+        try {
+            const guild = await this.discordClient.guilds.fetch(guildSnowflake)
+            const channel = await guild.channels.fetch(channelSnowflake)
+            channel.send(text)
+        } catch (e) {
+            console.log(`ERROR: Failed to find guild/channel ${guildSnowflake}/${channelSnowflake}, bailing out`, e)
+        }
+    }
+
     async discordMessage(msg) {
         // console.log(msg)
 
@@ -54,7 +64,7 @@ const DiscordBot = class DiscordBot {
         }
 
         if (msg.attachments != null) {
-            msg.attachments.each(function (a) {
+            msg.attachments.each((a) => {
                 if (
                     a.url != null &&
                     (a.contentType === "image/png" || a.contentType === "image/jpg" || a.contentType === "image/jpeg")
@@ -66,7 +76,7 @@ const DiscordBot = class DiscordBot {
                 }
             })
         }
-        req.suppress = function() {
+        req.suppress = () => {
             if (req.discordMsg.inGuild()) {
                 console.log("Suppressing embeds...")
                 req.discordMsg.suppressEmbeds(true)
@@ -74,7 +84,7 @@ const DiscordBot = class DiscordBot {
                 console.log("It's a DM, not suppressing embeds...")
             }
         }
-        req.reply = async function (r) {
+        req.reply = async (r) => {
             if (!r.text) {
                 console.warn("DiscordBot: Ignoring reply with no .text field")
                 return

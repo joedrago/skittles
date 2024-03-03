@@ -267,6 +267,12 @@ class Skittles {
         return action.deck.pop()
     }
 
+    shout(guildSnowflake, channelSnowflake, text) {
+        for (let bot of this.bots) {
+            bot.shout(guildSnowflake, channelSnowflake, text)
+        }
+    }
+
     async request(req) {
         console.log(`Request: "${req.raw}"`)
 
@@ -280,7 +286,7 @@ class Skittles {
                         // Do nothing!
                         return
                     }
-                    if(action.dmonly && !req.dm) {
+                    if (action.dmonly && !req.dm) {
                         // This action only works on DMs
                         console.log("skipping ", action.description)
                         continue
@@ -351,6 +357,10 @@ const modFiles = (modName) => {
     return files
 }
 
+const shout = (guildSnowflake, channelSnowflake, text) => {
+    instance_.shout(guildSnowflake, channelSnowflake, text)
+}
+
 const jsonRequest = (url, postdata = null) => {
     return new Promise((resolve, reject) => {
         const method = postdata ? "POST" : "GET"
@@ -417,6 +427,7 @@ module.exports = {
     addReplacement,
     modFile,
     modFiles,
+    shout,
     jsonRequest,
     tempFile,
     tempDownload,
