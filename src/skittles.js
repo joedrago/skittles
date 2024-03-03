@@ -323,17 +323,28 @@ const addReplacement = (...args) => {
     return instance_.addReplacement(...args)
 }
 
-const spawn = async (executable, args) => {
+const spawn = async (executable, args, lines = false) => {
     return new Promise((resolve, reject) => {
         console.error(`skittles.spawn(${executable}): `, args)
 
-        const proc = childProcessSpawn(executable, args, { stdio: "inherit", cwd: path.join(__dirname, "..") })
+        const stdio = lines ? "pipe" : "inherit" 
+        const proc = childProcessSpawn(executable, args, { stdio: stdio, cwd: path.join(__dirname, "..") })
+        let output = ""
         proc.on("error", (err) => {
             console.error(`Failed to spawn process: ${err}`)
             resolve(null)
         })
+        if(lines) {
+            proc.stdout.on('data', (data) => {
+                output += data
+            })
+        }
         proc.on("close", (code) => {
-            resolve(true)
+            if(lines) {
+                resolve(output.split(/[\r\n]/))
+            } else {
+                resolve(true)
+            }
         })
     })
 }
