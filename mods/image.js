@@ -12,6 +12,10 @@ const googleImageSearch = async (searchTerm) => {
             return
         }
 
+        if(searchTerm.match(/^https?:\/\//)) {
+            return resolve( { urls: [searchTerm] } );
+        }
+
         const searchURL = `https://www.googleapis.com/customsearch/v1?q=${encodeURI(
             searchTerm
         )}&cx=${cxG}&fileType=jpg&searchType=image&key=${keyG}`
