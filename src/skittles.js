@@ -198,19 +198,24 @@ class Skittles {
         }
     }
 
-    async tempDownload(url) {
+    async tempDownload(url, forcedExtension) {
         return new Promise((resolve, reject) => {
             const proto = !url.charAt(4).localeCompare("s") ? https : http
 
-            let parsedURL = null
-            let parsed = null
-            try {
-                parsedURL = new URL(url)
-                parsed = path.parse(parsedURL.pathname)
-            } catch (e) {
-                return resolve({ error: `Not a valid URL: ${url}` })
+            let ext = ""
+            if(forcedExtension && forcedExtension.length > 0) {
+                ext = forcedExtension
+            } else {
+                let parsedURL = null
+                let parsed = null
+                try {
+                    parsedURL = new URL(url)
+                    parsed = path.parse(parsedURL.pathname)
+                } catch (e) {
+                    return resolve({ error: `Not a valid URL: ${url}` })
+                }
+                ext = parsed.ext.substr(1)
             }
-            const ext = parsed.ext.substr(1)
             if (!ext.length) {
                 return resolve({ error: `Couldn't detect extension: ${url}` })
             }
