@@ -54,9 +54,10 @@ class Skittles {
         this.mods = {}
         this.replacements = {}
         this.actions = []
+        this.cliMode = false
     }
 
-    init(configFilename) {
+    async init(configFilename, argv) {
         if (this.configFilename) {
             fatal("You may not call skittles.init() twice!")
         }
@@ -71,8 +72,12 @@ class Skittles {
         watchAll(path.join(__dirname, "..", "mods"))
         watch(configFilename)
 
+        // See if we're just running the quick cli version
+        this.cliMode = (argv.length > 0)
+
         // Make an empty, fresh tempdir
-        this.tempDir = path.join(__dirname, "..", "skittles.temp")
+        const tempDirBasename = (this.cliMode) ? "skittles.temp.cli" : "skittles.temp"
+        this.tempDir = path.join(__dirname, "..", tempDirBasename)
         try {
             fs.mkdirSync(this.tempDir)
         } catch (e) {
@@ -92,29 +97,6 @@ class Skittles {
         this.config = TOML.parse(fs.readFileSync(this.configFilename))
         if (this.config instanceof Error) {
             fatal(this.config.stack)
-        }
-
-        if (!this.config.discordBotToken) {
-            return fatal(`Config missing "discordBotToken": ${this.configFilename}`)
-        }
-
-        let botTokens = []
-        if (Array.isArray(this.config.discordBotToken)) {
-            botTokens = this.config.discordBotToken
-        } else {
-            botTokens = [this.config.discordBotToken]
-        }
-
-        for (const botToken of botTokens) {
-            let bot = new DiscordBot(botToken)
-            bot.on("ready", (tag) => {
-                console.log("Logged in: ", tag)
-            })
-            bot.on("request", (req) => {
-                this.request(req)
-            })
-            bot.login()
-            this.bots.push(bot)
         }
 
         const modDirs = [path.join(__dirname, "..", "mods")]
@@ -146,6 +128,53 @@ class Skittles {
             a.deck = []
             this.actions.push(a)
         }
+
+        if(this.cliMode) {
+            this.cli(argv)
+        } else {
+            if (!this.config.discordBotToken) {
+                return fatal(`Config missing "discordBotToken": ${this.configFilename}`)
+            }
+
+            let botTokens = []
+            if (Array.isArray(this.config.discordBotToken)) {
+                botTokens = this.config.discordBotToken
+            } else {
+                botTokens = [this.config.discordBotToken]
+            }
+
+            for (const botToken of botTokens) {
+                let bot = new DiscordBot(botToken)
+                bot.on("ready", (tag) => {
+                    console.log("Logged in: ", tag)
+                })
+                bot.on("request", (req) => {
+                    this.request(req)
+                })
+                bot.login()
+                this.bots.push(bot)
+            }
+        }
+    }
+
+    async cli(argv) {
+        let raw = argv.join(" ").trim()
+        let req = {
+            //discordMsg: msg,
+            dm: false,
+            raw: raw,
+            suppress: () => {}
+        }
+//        if (req.images == null) {
+//            req.images = []
+//        }
+//        return req.images.push(a.url)
+
+        console.log("created req: ", req)
+        req.reply = async (r) => {
+            console.log(r)
+        }
+        await this.request(req)
     }
 
     tempFile(ext) {
@@ -299,14 +328,14 @@ class Skittles {
                         if (action.mod) {
                             const e = this.mods[action.mod]
                             if (e) {
-                                e.mod.request(req, action.key, capture)
+                                await e.mod.request(req, action.key, capture)
                             } else {
                                 console.warn(`no mod entry named: ${action.mod}`)
                             }
                         } else {
                             let text = this.actionReply(action)
                             let replacedText = await this.replaceAll(capture, text)
-                            req.reply({ text: replacedText, reply: false })
+                            await req.reply({ text: replacedText, reply: false })
                         }
 
                         // Only respond with the first matched action
@@ -423,6 +452,10 @@ const config = (...args) => {
     return instance_.config
 }
 
+const cli = (...args) => {
+    return instance_.cliMode
+}
+
 const init = (...args) => {
     instance_.init(...args)
 }
@@ -444,5 +477,6 @@ module.exports = {
     tempDownload,
     commands,
     config,
+    cli,
     init
 }

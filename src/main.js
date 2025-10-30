@@ -3,4 +3,4 @@
 const { init } = require("./skittles")
 const path = require("path")
 
-init(path.join(__dirname, "..", "skittles.toml"))
+init(path.join(__dirname, "..", "skittles.toml"), process.argv.slice(2))
