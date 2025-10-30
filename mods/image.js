@@ -2,6 +2,8 @@ const skittles = require("../src/skittles")
 const fs = require("fs")
 const Jimp = require("jimp")
 
+const KBURNS_IMAGE_COUNT = 5
+
 const googleImageSearch = async (searchTerm) => {
     return new Promise(async (resolve, reject) => {
         const config = skittles.config()
@@ -60,7 +62,7 @@ const compositeImage = async (req, key, capture) => {
 
     // Download a random image URL
     const randomURL = search.urls[Math.floor(Math.random() * search.urls.length)]
-    const downloaded = await skittles.tempDownload(randomURL)
+    const downloaded = await skittles.tempDownload(randomURL, "jpg")
     if (downloaded.error) {
         return req.reply({ text: `ERROR: ${downloaded.error}` })
     }
@@ -92,12 +94,69 @@ const compositeImage = async (req, key, capture) => {
     req.reply({ text: "=>", files: [outputImageFilename] })
 }
 
+const kburnsImage = async (req, key, capture) => {
+    const overlayImage = req.action.overlayImage
+    if (!overlayImage) {
+        return req.reply({ text: "ERROR: overlayImage is misconfigured, sorry." })
+    }
+    const overlaySound = req.action.overlaySound
+    if (!overlaySound) {
+        return req.reply({ text: "ERROR: overlaySound is misconfigured, sorry." })
+    }
+
+    // Find some image URLs
+    const searchTerm = capture[1].trim()
+    const search = await googleImageSearch(searchTerm)
+    if (search.error) {
+        return req.reply({ text: `ERROR: ${search.error}` })
+    }
+
+    // Download a few images
+    let downloads = []
+    for(let url of search.urls) {
+        const downloaded = await skittles.tempDownload(url, "jpg")
+        if (downloaded.error) {
+            console.log(`Skipping URL: "${url}", got download error "${downloaded.error}"`)
+        } else {
+            downloads.push(downloaded)
+        }
+        if(downloads.length >= KBURNS_IMAGE_COUNT) {
+            break
+        }
+    }
+    if(downloads.length < KBURNS_IMAGE_COUNT) {
+        return req.reply({ text: `ERROR: Failed to download enough images for ${searchTerm}`})
+    }
+
+    const kburnsFilename = skittles.tempFile("mp4")
+    console.log(`Generating kburns ${downloads} => ${kburnsFilename}`)
+    let kburnsArgs = [
+        "--size=640x360",
+        "--fps=12",
+        `--overlay=${overlayImage}`,
+        `--audio=${overlaySound}`,
+    ]
+    for(let download of downloads) {
+        kburnsArgs.push(download.filename)
+    }
+    kburnsArgs.push(kburnsFilename)
+    const generated = await skittles.spawn("kburns", kburnsArgs)
+    if (!generated || !fs.existsSync(kburnsFilename)) {
+        return req.reply({ text: `Failed to create MP4: ${searchTerm}` })
+    }
+
+    // Save and upload to discord
+    req.reply({ text: "=>", files: [kburnsFilename] })
+}
+
 const request = async (req, key, capture) => {
     switch (key) {
         case "image":
             return randomGoogleImage(req, key, capture)
         case "composite":
             return compositeImage(req, key, capture)
+        case "kburns":
+            return kburnsImage(req, key, capture)
     }
     req.reply({ text: `image module: unknown key ${key}` })
 }
