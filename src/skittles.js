@@ -130,7 +130,7 @@ class Skittles {
         }
 
         if(this.cliMode) {
-            this.cli(argv)
+            await this.cli(argv)
         } else {
             if (!this.config.discordBotToken) {
                 return fatal(`Config missing "discordBotToken": ${this.configFilename}`)
@@ -181,14 +181,18 @@ class Skittles {
         while (true) {
             const filename = path.join(this.tempDir, `${randomString()}.${ext}`)
             if (!fs.existsSync(filename)) {
-                setTimeout(() => {
-                    console.log(`cleaning up: ${filename}`)
-                    try {
-                        fs.unlinkSync(filename)
-                    } catch (e) {
-                        // Who cares
-                    }
-                }, TEMP_FILE_CLEANUP_MS)
+                if(this.cli) {
+                    console.log(`CLI mode skipping cleanup of: ${filename}`)
+                } else {
+                    setTimeout(() => {
+                        console.log(`cleaning up: ${filename}`)
+                        try {
+                            fs.unlinkSync(filename)
+                        } catch (e) {
+                            // Who cares
+                        }
+                    }, TEMP_FILE_CLEANUP_MS)
+                }
                 return filename
             }
         }
