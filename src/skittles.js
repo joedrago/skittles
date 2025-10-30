@@ -181,7 +181,7 @@ class Skittles {
         while (true) {
             const filename = path.join(this.tempDir, `${randomString()}.${ext}`)
             if (!fs.existsSync(filename)) {
-                if(this.cli) {
+                if(this.cliMode) {
                     console.log(`CLI mode skipping cleanup of: ${filename}`)
                 } else {
                     setTimeout(() => {
