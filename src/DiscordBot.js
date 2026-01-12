@@ -58,6 +58,7 @@ const DiscordBot = class DiscordBot {
         let raw = msg.content.trim()
         let req = {
             discordMsg: msg,
+            channel: msg.channelId,
             dm: !msg.inGuild(),
             raw: raw,
             ref: ref

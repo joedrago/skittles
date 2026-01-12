@@ -312,14 +312,16 @@ class Skittles {
     }
 
     async request(req) {
-        console.log(`Request: "${req.raw}"`)
+        console.log(`Request[${req.channel}]: "${req.raw}"`)
 
         for (const action of this.actions) {
             for (const trigger of action.triggers) {
                 const capture = req.raw.match(new RegExp(trigger, "i"))
                 if (capture) {
                     req.action = action
-                    console.log(`matched: ${action.description}`)
+                    if (!action.channel) {
+                        console.log(`matched: ${action.description}`)
+                    }
                     if (action.noop) {
                         // Do nothing!
                         return
@@ -327,6 +329,10 @@ class Skittles {
                     if (action.dmonly && !req.dm) {
                         // This action only works on DMs
                         console.log("skipping ", action.description)
+                        continue
+                    }
+                    if (action.channel && (action.channel != req.channel)) {
+                        // this action only works in a single channel
                         continue
                     }
                     const sayIt = Math.floor(Math.random() * 1000)
