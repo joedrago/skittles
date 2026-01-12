@@ -227,10 +227,17 @@ require.cache[skittlesPath] = {
 const args = process.argv.slice(2)
 
 if (args.length < 1) {
-    console.log("Usage: node mod-debug.js <mod-name> [key]")
+    console.log("Usage: node mod-debug.js <mod-name> [trigger-regex] [key]")
     console.log("")
-    console.log("  mod-name   Name of the mod to load (e.g., 'jeopardy', 'gif')")
-    console.log("  key        Optional key to pass to the mod (default: none)")
+    console.log("  mod-name       Name of the mod to load (e.g., 'jeopardy', 'gif')")
+    console.log("  trigger-regex  Optional regex to parse input (default: ^(\\S+)\\s*(.*) )")
+    console.log("                 The regex is matched against input, and capture groups")
+    console.log("                 become the capture array passed to the mod.")
+    console.log("  key            Optional key to pass to the mod (default: none)")
+    console.log("")
+    console.log("Examples:")
+    console.log("  node mod-debug.js jeopardy")
+    console.log("  node mod-debug.js jeopardy '^!jeo(?:pardy)?\\s*(.*)' start")
     console.log("")
     console.log("Available mods:")
     const modsDir = path.join(__dirname, "mods")
@@ -244,7 +251,17 @@ if (args.length < 1) {
 }
 
 const modName = args[0]
-let currentKey = args[1] || null
+let triggerPattern = args[1] || "^(\\S+)\\s*(.*)"
+let currentKey = args[2] || null
+let triggerRegex
+
+try {
+    triggerRegex = new RegExp(triggerPattern)
+} catch (e) {
+    console.error(`Error: Invalid trigger regex: ${triggerPattern}`)
+    console.error(e.message)
+    process.exit(1)
+}
 
 // Load the mod
 const modPath = path.join(__dirname, "mods", `${modName}.js`)
@@ -255,6 +272,7 @@ if (!fs.existsSync(modPath)) {
 
 console.log(`\n=== Mod Debug REPL ===`)
 console.log(`Loading mod: ${modName}`)
+console.log(`Trigger regex: ${triggerPattern}`)
 if (currentKey) {
     console.log(`Initial key: ${currentKey}`)
 }
@@ -280,12 +298,12 @@ console.log(`Mod loaded successfully!\n`)
 let channelId = "debug-channel-123"
 let isDM = false
 let images = []
-let rawMode = "capture1" // "capture1" = req.raw is capture[1], "full" = req.raw is full input
 
 function printHelp() {
     console.log(`
 Commands:
   .help              Show this help
+  .trigger <regex>   Set the trigger regex (current: ${triggerPattern})
   .key <name>        Set the key passed to the mod (current: ${currentKey || "(none)"})
   .channel <id>      Set channel ID (current: ${channelId})
   .dm <true|false>   Set DM mode (current: ${isDM})
@@ -295,8 +313,8 @@ Commands:
 
 Sending messages:
   Just type any text and press Enter to send it as a message to the mod.
-  The text becomes both req.raw and capture[0], with capture[1] being everything
-  after the first word (simulating a typical trigger pattern like "!command (.*)")
+  The input is matched against the trigger regex, and capture groups become
+  the capture array passed to the mod. req.raw is always the full input.
 
   Use ">" prefix for a raw capture override:
   > foo|bar|baz      Sets capture = ["foo|bar|baz", "foo", "bar", "baz"] (split by |)
@@ -307,6 +325,7 @@ function printState() {
     console.log(`
 Current State:
   Mod:      ${modName}
+  Trigger:  ${triggerPattern}
   Key:      ${currentKey || "(none)"}
   Channel:  ${channelId}
   DM:       ${isDM}
@@ -320,12 +339,14 @@ async function sendRequest(raw, captureOverride = null) {
     if (captureOverride) {
         capture = captureOverride
     } else {
-        // Simulate a typical trigger: capture[0] = full match, capture[1] = rest after first word
-        const firstSpace = raw.indexOf(" ")
-        if (firstSpace > 0) {
-            capture = [raw, raw.substring(firstSpace + 1)]
+        // Match input against the trigger regex
+        const match = raw.match(triggerRegex)
+        if (match) {
+            capture = Array.from(match)
         } else {
-            capture = [raw, ""]
+            console.log(`\n  ⚠ Input did not match trigger regex: ${triggerPattern}`)
+            console.log(`    Input was: ${JSON.stringify(raw)}\n`)
+            return
         }
     }
 
@@ -405,6 +426,21 @@ rl.on("line", async (line) => {
         switch (cmd) {
             case ".help":
                 printHelp()
+                break
+
+            case ".trigger":
+                if (parts[1]) {
+                    const newPattern = trimmed.substring(".trigger".length).trim()
+                    try {
+                        triggerRegex = new RegExp(newPattern)
+                        triggerPattern = newPattern
+                        console.log(`Trigger regex set to: ${triggerPattern}`)
+                    } catch (e) {
+                        console.log(`Invalid regex: ${e.message}`)
+                    }
+                } else {
+                    console.log(`Current trigger: ${triggerPattern}`)
+                }
                 break
 
             case ".key":
