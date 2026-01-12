@@ -221,6 +221,200 @@ require.cache[skittlesPath] = {
 }
 
 // =============================================================================
+// Discord-style text renderer
+// =============================================================================
+
+const ANSI = {
+    reset: "\x1b[0m",
+    bold: "\x1b[1m",
+    dim: "\x1b[2m",
+    italic: "\x1b[3m",
+    underline: "\x1b[4m",
+    inverse: "\x1b[7m",
+    strikethrough: "\x1b[9m",
+    // Colors
+    gray: "\x1b[90m",
+    cyan: "\x1b[36m",
+    yellow: "\x1b[33m",
+    blue: "\x1b[34m",
+    white: "\x1b[37m",
+    // Background
+    bgGray: "\x1b[100m",
+}
+
+// Strip ANSI codes to get visible length
+function visibleLength(str) {
+    return str.replace(/\x1b\[[0-9;]*m/g, "").length
+}
+
+// Word wrap text to a given width, preserving ANSI codes and indentation
+function wordWrap(text, maxWidth, indent = "") {
+    if (visibleLength(text) <= maxWidth) {
+        return [text]
+    }
+
+    const words = []
+    // Split by spaces but keep ANSI codes attached to their words
+    let current = ""
+    let inAnsi = false
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i]
+        if (char === "\x1b") {
+            inAnsi = true
+            current += char
+        } else if (inAnsi) {
+            current += char
+            if (char === "m") {
+                inAnsi = false
+            }
+        } else if (char === " " && current.length > 0) {
+            words.push(current)
+            current = ""
+        } else if (char !== " " || current.length > 0) {
+            current += char
+        }
+    }
+    if (current.length > 0) {
+        words.push(current)
+    }
+
+    const lines = []
+    let currentLine = ""
+    let currentLen = 0
+    let activeAnsi = "" // Track active ANSI codes to re-apply on new lines
+
+    for (const word of words) {
+        const wordLen = visibleLength(word)
+        const spaceNeeded = currentLen > 0 ? 1 : 0
+
+        if (currentLen + spaceNeeded + wordLen > maxWidth && currentLen > 0) {
+            // Wrap to new line
+            lines.push(currentLine + ANSI.reset)
+            currentLine = indent + activeAnsi + word
+            currentLen = visibleLength(indent) + wordLen
+        } else {
+            currentLine += (currentLen > 0 ? " " : "") + word
+            currentLen += spaceNeeded + wordLen
+        }
+
+        // Track ANSI state for continuation
+        const ansiMatches = word.match(/\x1b\[[0-9;]*m/g)
+        if (ansiMatches) {
+            for (const code of ansiMatches) {
+                if (code === ANSI.reset) {
+                    activeAnsi = ""
+                } else {
+                    activeAnsi += code
+                }
+            }
+        }
+    }
+
+    if (currentLine.length > 0) {
+        lines.push(currentLine)
+    }
+
+    return lines
+}
+
+function renderDiscordText(text, maxWidth = 76) {
+    if (!text) return []
+
+    // Account for the "  │ " prefix (4 chars)
+    const contentWidth = maxWidth - 4
+
+    // Process inline formatting (bold, italic, code, strikethrough, underline)
+    function processInline(line) {
+        // Code blocks (inline `code`)
+        line = line.replace(/`([^`]+)`/g, `${ANSI.bgGray}${ANSI.white} $1 ${ANSI.reset}`)
+        // Bold **text** or __text__
+        line = line.replace(/\*\*([^*]+)\*\*/g, `${ANSI.bold}$1${ANSI.reset}`)
+        line = line.replace(/__([^_]+)__/g, `${ANSI.bold}$1${ANSI.reset}`)
+        // Italic *text* or _text_
+        line = line.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, `${ANSI.italic}$1${ANSI.reset}`)
+        line = line.replace(/(?<!_)_([^_]+)_(?!_)/g, `${ANSI.italic}$1${ANSI.reset}`)
+        // Strikethrough ~~text~~
+        line = line.replace(/~~([^~]+)~~/g, `${ANSI.strikethrough}$1${ANSI.reset}`)
+        return line
+    }
+
+    const lines = text.split("\n")
+    const rendered = []
+    let inCodeBlock = false
+
+    for (const line of lines) {
+        // Code block start/end
+        if (line.startsWith("```")) {
+            inCodeBlock = !inCodeBlock
+            if (inCodeBlock) {
+                rendered.push(`${ANSI.dim}┌──${line.slice(3) || "code"}──${ANSI.reset}`)
+            } else {
+                rendered.push(`${ANSI.dim}└────────${ANSI.reset}`)
+            }
+            continue
+        }
+
+        if (inCodeBlock) {
+            // Don't wrap code blocks, just truncate if needed
+            rendered.push(`${ANSI.dim}│${ANSI.reset} ${line}`)
+            continue
+        }
+
+        // Headers (large text in Discord) - render in cyan to indicate "large"
+        if (line.startsWith("### ")) {
+            const content = `${ANSI.cyan}${processInline(line.slice(4))}${ANSI.reset}`
+            const wrapped = wordWrap(content, contentWidth, "")
+            rendered.push(...wrapped)
+            continue
+        }
+        if (line.startsWith("## ")) {
+            const content = `${ANSI.cyan}${processInline(line.slice(3))}${ANSI.reset}`
+            const wrapped = wordWrap(content, contentWidth, "")
+            rendered.push(...wrapped)
+            continue
+        }
+        if (line.startsWith("# ")) {
+            const content = `${ANSI.cyan}${processInline(line.slice(2))}${ANSI.reset}`
+            const wrapped = wordWrap(content, contentWidth, "")
+            rendered.push(...wrapped)
+            continue
+        }
+
+        // Blockquote
+        if (line.startsWith("> ")) {
+            let inner = line.slice(2)
+            let color = ANSI.gray
+
+            // Check for headers inside blockquote (large text)
+            if (inner.startsWith("### ")) {
+                inner = inner.slice(4)
+                color = ANSI.cyan
+            } else if (inner.startsWith("## ")) {
+                inner = inner.slice(3)
+                color = ANSI.cyan
+            } else if (inner.startsWith("# ")) {
+                inner = inner.slice(2)
+                color = ANSI.cyan
+            }
+
+            const content = processInline(inner)
+            const wrapped = wordWrap(content, contentWidth - 2, "")
+            for (const wrappedLine of wrapped) {
+                rendered.push(`${ANSI.gray}▐${ANSI.reset} ${color}${wrappedLine}${ANSI.reset}`)
+            }
+            continue
+        }
+
+        // Regular line
+        const content = processInline(line)
+        const wrapped = wordWrap(content, contentWidth, "")
+        rendered.push(...wrapped)
+    }
+
+    return rendered
+}
+
+// =============================================================================
 // CLI and REPL
 // =============================================================================
 
@@ -374,7 +568,22 @@ async function sendRequest(raw, captureOverride = null) {
             if (r.files) {
                 console.log(`  │   files: ${JSON.stringify(r.files)}`)
             }
-            console.log(`  ╰─────────────────────────────────────\n`)
+            console.log(`  ╰─────────────────────────────────────`)
+            // Render Discord-style preview
+            if (r.text) {
+                const termWidth = process.stdout.columns || 80
+                const boxWidth = Math.min(termWidth - 2, 78) // Leave margin, cap at 78
+                const borderLine = "─".repeat(boxWidth - 4)
+
+                console.log(``)
+                console.log(`  ${ANSI.dim}┌─ Preview ${borderLine.slice(10)}${ANSI.reset}`)
+                const rendered = renderDiscordText(r.text, boxWidth)
+                for (const line of rendered) {
+                    console.log(`  ${ANSI.dim}│${ANSI.reset} ${line}`)
+                }
+                console.log(`  ${ANSI.dim}└${borderLine}${ANSI.reset}`)
+            }
+            console.log(``)
         }
     }
 
