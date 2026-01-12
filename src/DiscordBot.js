@@ -61,7 +61,8 @@ const DiscordBot = class DiscordBot {
             channel: msg.channelId,
             dm: !msg.inGuild(),
             raw: raw,
-            ref: ref
+            ref: ref,
+            nickname: msg.member?.displayName || msg.author.displayName || msg.author.username
         }
 
         if (msg.attachments != null) {

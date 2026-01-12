@@ -492,6 +492,7 @@ console.log(`Mod loaded successfully!\n`)
 let channelId = "debug-channel-123"
 let isDM = false
 let images = []
+let nickname = "DebugUser"
 
 function printHelp() {
     console.log(`
@@ -499,6 +500,7 @@ Commands:
   .help              Show this help
   .trigger <regex>   Set the trigger regex (current: ${triggerPattern})
   .key <name>        Set the key passed to the mod (current: ${currentKey || "(none)"})
+  .nickname <name>   Set the sender's nickname (current: ${nickname})
   .channel <id>      Set channel ID (current: ${channelId})
   .dm <true|false>   Set DM mode (current: ${isDM})
   .images <url,...>  Set image URLs (comma-separated, or empty to clear)
@@ -521,6 +523,7 @@ Current State:
   Mod:      ${modName}
   Trigger:  ${triggerPattern}
   Key:      ${currentKey || "(none)"}
+  Nickname: ${nickname}
   Channel:  ${channelId}
   DM:       ${isDM}
   Images:   ${images.length > 0 ? images.join(", ") : "(none)"}
@@ -549,6 +552,7 @@ async function sendRequest(raw, captureOverride = null) {
         channel: channelId,
         dm: isDM,
         raw: raw,
+        nickname: nickname,
         ref: null,
         images: images.length > 0 ? [...images] : undefined,
         action: {
@@ -591,10 +595,11 @@ async function sendRequest(raw, captureOverride = null) {
     console.log(`\n╔═══════════════════════════════════════════════════════════════`)
     console.log(`║ Sending request to mod: ${modName}`)
     console.log(`╠═══════════════════════════════════════════════════════════════`)
-    console.log(`║ key:     ${currentKey || "(none)"}`)
-    console.log(`║ capture: ${JSON.stringify(capture)}`)
-    console.log(`║ req.raw: ${JSON.stringify(raw)}`)
-    console.log(`║ req.dm:  ${isDM}`)
+    console.log(`║ key:      ${currentKey || "(none)"}`)
+    console.log(`║ capture:  ${JSON.stringify(capture)}`)
+    console.log(`║ req.raw:  ${JSON.stringify(raw)}`)
+    console.log(`║ req.nickname: ${nickname}`)
+    console.log(`║ req.dm:   ${isDM}`)
     if (images.length > 0) {
         console.log(`║ req.images: ${JSON.stringify(images)}`)
     }
@@ -655,6 +660,11 @@ rl.on("line", async (line) => {
             case ".key":
                 currentKey = parts[1] || null
                 console.log(`Key set to: ${currentKey || "(none)"}`)
+                break
+
+            case ".nickname":
+                nickname = trimmed.substring(".nickname".length).trim() || "DebugUser"
+                console.log(`Nickname set to: ${nickname}`)
                 break
 
             case ".channel":

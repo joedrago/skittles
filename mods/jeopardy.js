@@ -29,7 +29,7 @@ let bot = null
 let currentQuestion = null
 
 const request = async (req, key, capture) => {
-    if(!inited) {
+    if (!inited) {
         inited = true
         const dbPath = skittles.modFile("jeopardy", "trivia.sqlite")
         const cachePath = "/home/joe/jeopardy-cache.json"
@@ -40,16 +40,18 @@ const request = async (req, key, capture) => {
             console.error(`Expected database at: ${dbPath}`)
             bot = null
         }
-        if(bot) {
+        if (bot) {
             const seen = bot.getSeenCount()
             const total = bot.getTotalCount()
             console.log(`Loaded ${total.toLocaleString()} questions (${seen.toLocaleString()} previously seen).\n`)
         }
     }
-    if(!bot) {
+    if (!bot) {
         console.log("jeopardy is broken, bot failed to load, skipping request")
         return
     }
+
+    console.log(`guesser: ${req.nickname}`)
 
     const answer = capture[1].trim()
     const lowerAnswer = answer.toLowerCase()
@@ -61,7 +63,7 @@ const request = async (req, key, capture) => {
         currentQuestion = null
     }
 
-    if(currentQuestion) {
+    if (currentQuestion) {
         // Check the answer
         const result = bot.checkAnswer(currentQuestion.id, answer)
 
