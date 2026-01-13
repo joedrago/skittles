@@ -449,6 +449,41 @@ const ordinalWords = {
 const ordinalDigits = Object.fromEntries(Object.entries(ordinalWords).map(([word, digit]) => [digit, word]))
 
 /**
+ * Simple singularization - converts common plural forms to singular
+ * Handles: -s, -es, -ies endings
+ */
+function singularize(word) {
+    if (!word || word.length < 3) return word
+
+    // Words ending in 'ies' -> 'y' (stories -> story, cities -> city)
+    if (word.endsWith('ies') && word.length > 4) {
+        return word.slice(0, -3) + 'y'
+    }
+
+    // Words ending in 'es' after s, x, z, ch, sh -> remove 'es'
+    if (word.endsWith('ses') || word.endsWith('xes') ||
+        word.endsWith('zes') || word.endsWith('ches') ||
+        word.endsWith('shes')) {
+        return word.slice(0, -2)
+    }
+
+    // Words ending in 's' (but not 'ss') -> remove 's'
+    if (word.endsWith('s') && !word.endsWith('ss') && word.length > 3) {
+        return word.slice(0, -1)
+    }
+
+    return word
+}
+
+/**
+ * Singularize all words in a string
+ */
+function singularizeAll(str) {
+    if (!str) return ""
+    return str.split(/\s+/).map(singularize).join(' ')
+}
+
+/**
  * Basic normalization: lowercase, strip articles, punctuation, whitespace
  */
 function basicNormalize(str) {
@@ -559,6 +594,16 @@ function checkAnswer(userAnswer, correctAnswer) {
     const correctWords = normalizeToWords(correctAnswer)
     if (userWords === correctWords) return true
 
+    // Try with singularization (comics -> comic, comic books -> comic book)
+    const userSingular = singularizeAll(userDigits)
+    const correctSingular = singularizeAll(correctDigits)
+    if (userSingular === correctSingular) return true
+
+    // Check if singularized forms match via substring
+    // e.g., "comics" -> "comic" is substring of "comic books" -> "comic book"
+    if (correctSingular.length >= 3 && userSingular.includes(correctSingular)) return true
+    if (userSingular.length >= 3 && correctSingular.includes(userSingular)) return true
+
     // For purely numerical answers (years, counts, quantities), require exact match
     // No fuzzy matching allowed - "1776" should not match "1876"
     if (isPurelyNumerical(correctDigits) && isPurelyNumerical(userDigits)) {
@@ -600,6 +645,9 @@ module.exports = {
     digitsToWords,
     checkAnswer,
     isPurelyNumerical,
+    // Pluralization utilities
+    singularize,
+    singularizeAll,
     // Fuzzy matching utilities
     damerauLevenshtein,
     isWithinEditDistance,
