@@ -11,6 +11,12 @@ const SKIP_COMMANDS = ["?", "skip", "pass", "give up", "giveup", "idk", "i don't
 let scoreboard = {} // { nickname: correctCount }
 let lastRequestTime = null
 
+// Timeout tracking for auto-skip
+let firstGuessTime = null
+let timeoutTimer = null
+let lastChannel = null // { guildId, channelId }
+const ANSWER_TIMEOUT_MS = 30 * 1000
+
 // Format the scoreboard for display (terse, sorted by score descending)
 function formatScoreboard(scores, isFinal = false) {
     const entries = Object.entries(scores).sort((a, b) => b[1] - a[1])
@@ -52,9 +58,56 @@ function formatQuestion(question) {
     return `_${prefix}:_\n> # ${clue}`
 }
 
+// Build full message with optional prefix, scoreboard, and question
+function buildQuestionMessage(question, prefix = null) {
+    const scoreText = formatScoreboard(scoreboard)
+    const questionText = formatQuestion(question)
+    let parts = []
+    if (prefix) parts.push(prefix)
+    if (scoreText) parts.push(scoreText)
+    parts.push(questionText)
+    return parts.join("\n\n")
+}
+
 let inited = false
 let bot = null
 let currentQuestion = null
+
+// Handle timeout - auto-skip when time runs out
+function handleTimeout() {
+    console.log("[jeopardy] Timeout fired!")
+    if (!currentQuestion || !lastChannel || !bot) {
+        console.log("[jeopardy] Timeout aborted: missing currentQuestion, lastChannel, or bot")
+        return
+    }
+
+    const correctAnswer = bot.giveUp(currentQuestion.id)
+    console.log(`[jeopardy] Time's up! Answer was: ${correctAnswer}`)
+    currentQuestion = bot.getQuestion()
+    firstGuessTime = null
+
+    const prefix = `**Time is up!** The answer was: **${correctAnswer}**`
+    const fullText = buildQuestionMessage(currentQuestion, prefix)
+    skittles.shout(lastChannel.guildId, lastChannel.channelId, fullText)
+}
+
+// Clear any existing timeout
+function clearAnswerTimeout() {
+    if (timeoutTimer) {
+        console.log("[jeopardy] Clearing answer timeout")
+        clearTimeout(timeoutTimer)
+        timeoutTimer = null
+    }
+    firstGuessTime = null
+}
+
+// Start the answer timeout (called on first guess for a question)
+function startAnswerTimeout() {
+    clearAnswerTimeout()
+    firstGuessTime = Date.now()
+    timeoutTimer = setTimeout(handleTimeout, ANSWER_TIMEOUT_MS)
+    console.log(`[jeopardy] Started ${ANSWER_TIMEOUT_MS / 1000}s answer timeout`)
+}
 
 const request = async (req, key, capture) => {
     if (!inited) {
@@ -84,6 +137,7 @@ const request = async (req, key, capture) => {
     if (lastRequestTime !== null) {
         const elapsed = (now - lastRequestTime) / 1000
         if (elapsed >= ROUND_TIMEOUT_SECONDS && Object.keys(scoreboard).length > 0) {
+            clearAnswerTimeout()
             const finalScores = formatScoreboard(scoreboard, true)
             let newRoundText = `It's been a while since anyone played. Let's start a new round!\nHere are last round's scores:\n${finalScores}`
             if (currentQuestion) {
@@ -95,13 +149,20 @@ const request = async (req, key, capture) => {
     }
     lastRequestTime = now
 
-    console.log(`guesser: ${req.nickname}`)
+    // Track the channel for timeout shouts
+    if (req.discordMsg && req.discordMsg.guildId) {
+        lastChannel = {
+            guildId: req.discordMsg.guildId,
+            channelId: req.discordMsg.channelId
+        }
+    }
 
     const answer = capture[1].trim()
     const lowerAnswer = answer.toLowerCase()
 
     // Check for skip commands
     if (currentQuestion && SKIP_COMMANDS.includes(lowerAnswer)) {
+        clearAnswerTimeout()
         const correctAnswer = bot.giveUp(currentQuestion.id)
         req.reply({ text: `The answer was: **${correctAnswer}**` })
         currentQuestion = null
@@ -112,12 +173,17 @@ const request = async (req, key, capture) => {
         const result = bot.checkAnswer(currentQuestion.id, answer)
 
         if (result.correct) {
+            clearAnswerTimeout()
             // Update scoreboard
             scoreboard[req.nickname] = (scoreboard[req.nickname] || 0) + 1
 
             req.reply({ text: `# **Correct: ** ${result.answer}`, reply: true })
             currentQuestion = null
         } else {
+            // Wrong answer - start timeout on first guess for this question
+            if (!firstGuessTime) {
+                startAnswerTimeout()
+            }
             return // req.reply({ text: "**Incorrect. Try again, or type ? to skip.**", reply: true })
         }
     }
@@ -126,12 +192,7 @@ const request = async (req, key, capture) => {
         currentQuestion = bot.getQuestion()
     }
 
-    // Build question text with scoreboard if not empty
-    const scoreText = formatScoreboard(scoreboard)
-    const questionText = formatQuestion(currentQuestion)
-    const fullText = scoreText ? `${scoreText}\n${questionText}` : questionText
-
-    return req.reply({ text: fullText })
+    return req.reply({ text: buildQuestionMessage(currentQuestion) })
 }
 
 module.exports = {

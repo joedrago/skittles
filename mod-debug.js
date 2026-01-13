@@ -177,7 +177,27 @@ const mockSkittles = {
     },
 
     shout(guildSnowflake, channelSnowflake, text) {
-        console.log(`[skittles.shout] guild=${guildSnowflake} channel=${channelSnowflake} text="${text}"`)
+        console.log(`\n  ╭─────────────────────────────────────`)
+        console.log(`  │ skittles.shout() called:`)
+        console.log(`  │   guild: ${guildSnowflake}`)
+        console.log(`  │   channel: ${channelSnowflake}`)
+        console.log(`  │   text: ${JSON.stringify(text)}`)
+        console.log(`  ╰─────────────────────────────────────`)
+        // Render Discord-style preview (deferred until renderDiscordText is available)
+        if (text && typeof renderDiscordText === "function") {
+            const termWidth = process.stdout.columns || 80
+            const boxWidth = Math.min(termWidth - 2, 78)
+            const borderLine = "─".repeat(boxWidth - 4)
+
+            console.log(``)
+            console.log(`  ${ANSI.yellow}┌─ SHOUT Preview ${borderLine.slice(16)}${ANSI.reset}`)
+            const rendered = renderDiscordText(text, boxWidth)
+            for (const line of rendered) {
+                console.log(`  ${ANSI.yellow}│${ANSI.reset} ${line}`)
+            }
+            console.log(`  ${ANSI.yellow}└${borderLine}${ANSI.reset}`)
+        }
+        console.log(``)
     },
 
     addReplacement(replacement, func) {
@@ -490,6 +510,7 @@ console.log(`Mod loaded successfully!\n`)
 
 // REPL state
 let channelId = "debug-channel-123"
+let guildId = "debug-guild-456"
 let isDM = false
 let images = []
 let nickname = "DebugUser"
@@ -502,6 +523,7 @@ Commands:
   .key <name>        Set the key passed to the mod (current: ${currentKey || "(none)"})
   .nickname <name>   Set the sender's nickname (current: ${nickname})
   .channel <id>      Set channel ID (current: ${channelId})
+  .guild <id>        Set guild ID (current: ${guildId})
   .dm <true|false>   Set DM mode (current: ${isDM})
   .images <url,...>  Set image URLs (comma-separated, or empty to clear)
   .state             Show current REPL state
@@ -525,6 +547,7 @@ Current State:
   Key:      ${currentKey || "(none)"}
   Nickname: ${nickname}
   Channel:  ${channelId}
+  Guild:    ${guildId}
   DM:       ${isDM}
   Images:   ${images.length > 0 ? images.join(", ") : "(none)"}
 `)
@@ -558,6 +581,11 @@ async function sendRequest(raw, captureOverride = null) {
         action: {
             key: currentKey,
             mod: modName
+        },
+        // Mock Discord message object for mods that need guild/channel info
+        discordMsg: isDM ? null : {
+            guildId: guildId,
+            channelId: channelId
         },
         suppress: () => {
             console.log(`  [req.suppress() called]`)
@@ -670,6 +698,11 @@ rl.on("line", async (line) => {
             case ".channel":
                 channelId = parts[1] || "debug-channel-123"
                 console.log(`Channel set to: ${channelId}`)
+                break
+
+            case ".guild":
+                guildId = parts[1] || "debug-guild-456"
+                console.log(`Guild set to: ${guildId}`)
                 break
 
             case ".dm":
