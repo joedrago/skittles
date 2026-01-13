@@ -527,6 +527,15 @@ function normalizeToWords(str) {
 }
 
 /**
+ * Check if a normalized string is purely numerical (digits only)
+ * Used to detect answers like years, counts, quantities
+ */
+function isPurelyNumerical(str) {
+    if (!str) return false
+    return /^\d+$/.test(str)
+}
+
+/**
  * Check if two answers match using flexible comparison
  * Returns true if the answers are considered equivalent
  */
@@ -550,14 +559,23 @@ function checkAnswer(userAnswer, correctAnswer) {
     const correctWords = normalizeToWords(correctAnswer)
     if (userWords === correctWords) return true
 
+    // For purely numerical answers (years, counts, quantities), require exact match
+    // No fuzzy matching allowed - "1776" should not match "1876"
+    if (isPurelyNumerical(correctDigits) && isPurelyNumerical(userDigits)) {
+        return false
+    }
+
     // Check if user answer contains the correct answer or vice versa
     // This handles cases like "Jesse James" matching "jesse james" in a longer response
-    if (correctDigits.length >= 3 && userDigits.includes(correctDigits)) return true
-    if (userDigits.length >= 3 && correctDigits.includes(userDigits)) return true
+    // But skip this for purely numerical correct answers to prevent partial number matches
+    if (!isPurelyNumerical(correctDigits)) {
+        if (correctDigits.length >= 3 && userDigits.includes(correctDigits)) return true
+        if (userDigits.length >= 3 && correctDigits.includes(userDigits)) return true
 
-    // Check if correct answer contains user answer (for partial matches)
-    // e.g., user says "stooges" for "the three stooges"
-    if (userDigits.length >= 4 && correctDigits.includes(userDigits)) return true
+        // Check if correct answer contains user answer (for partial matches)
+        // e.g., user says "stooges" for "the three stooges"
+        if (userDigits.length >= 4 && correctDigits.includes(userDigits)) return true
+    }
 
     // Fuzzy matching: phonetic similarity (handles pronunciation-based errors)
     // e.g., "Tchaikovsky" vs "Chaikovsky", "Nietzsche" vs "Nietsche"
@@ -577,6 +595,7 @@ module.exports = {
     wordsToDigits,
     digitsToWords,
     checkAnswer,
+    isPurelyNumerical,
     // Fuzzy matching utilities
     damerauLevenshtein,
     isWithinEditDistance,
