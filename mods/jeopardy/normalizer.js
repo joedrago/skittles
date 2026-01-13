@@ -602,10 +602,7 @@ function checkAnswer(userAnswer, correctAnswer) {
     // Check if singularized forms match via substring
     // e.g., "comics" -> "comic" is substring of "comic books" -> "comic book"
     if (correctSingular.length >= 3 && userSingular.includes(correctSingular)) return true
-    // For partial matches, require a meaningful portion (>=40%) of the full answer
-    // e.g., "pope" for "Pope John Paul II" (25%) - NOT OK
-    const singularRatio = userSingular.length / correctSingular.length
-    if (userSingular.length >= 4 && singularRatio >= 0.4 && correctSingular.includes(userSingular)) return true
+    if (userSingular.length >= 3 && correctSingular.includes(userSingular)) return true
 
     // For purely numerical answers (years, counts, quantities), require exact match
     // No fuzzy matching allowed - "1776" should not match "1876"
