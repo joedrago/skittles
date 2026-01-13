@@ -569,12 +569,16 @@ function checkAnswer(userAnswer, correctAnswer) {
     // This handles cases like "Jesse James" matching "jesse james" in a longer response
     // But skip this for purely numerical correct answers to prevent partial number matches
     if (!isPurelyNumerical(correctDigits)) {
+        // User gave more context than needed - check if correct answer is within their response
         if (correctDigits.length >= 3 && userDigits.includes(correctDigits)) return true
-        if (userDigits.length >= 3 && correctDigits.includes(userDigits)) return true
 
-        // Check if correct answer contains user answer (for partial matches)
-        // e.g., user says "stooges" for "the three stooges"
-        if (userDigits.length >= 4 && correctDigits.includes(userDigits)) return true
+        // User gave partial answer - must be a meaningful portion (>=40%) of the full answer
+        // e.g., "stooges" for "the three stooges" (44%) - OK
+        // e.g., "and" for "Lincoln and Jefferson" (16%) - NOT OK
+        const partialRatio = userDigits.length / correctDigits.length
+        if (userDigits.length >= 4 && partialRatio >= 0.4 && correctDigits.includes(userDigits)) {
+            return true
+        }
     }
 
     // Fuzzy matching: phonetic similarity (handles pronunciation-based errors)
