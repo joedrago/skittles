@@ -1,5 +1,270 @@
+const express = require("express")
+const http = require("http")
+const { Server } = require("socket.io")
 const skittles = require("../src/skittles")
 const TriviaBot = require("./jeopardy/TriviaBot")
+
+// Start Express + Socket.IO server
+const app = express()
+const server = http.createServer(app)
+const io = new Server(server)
+
+// Dashboard state
+let lastMessage = null
+
+// Strip HTML tags from clue text
+function stripHtml(str) {
+    return str.replace(/<[^>]*>/g, "").trim()
+}
+
+// Build dashboard state object
+function getDashboardState() {
+    let question = null
+    if (currentQuestion) {
+        question = {
+            category: currentQuestion.category.toUpperCase(),
+            value: currentQuestion.value || "???",
+            clue: stripHtml(currentQuestion.clue),
+            year: currentQuestion.airDate ? new Date(currentQuestion.airDate).getFullYear() : null,
+            dailyDouble: currentQuestion.dailyDouble
+        }
+    }
+    return {
+        message: lastMessage,
+        scoreboard: { ...scoreboard },
+        question
+    }
+}
+
+// Broadcast current state to all connected clients
+function broadcastState() {
+    io.emit("state", getDashboardState())
+}
+
+// Dashboard HTML
+const dashboardHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeopardy Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #0f0f1a;
+            color: #e0e0e0;
+        }
+        .container {
+            display: flex;
+            height: 100vh;
+            padding: clamp(12px, 2vw, 24px);
+            gap: clamp(12px, 2vw, 24px);
+        }
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-width: 0;
+        }
+        .message {
+            color: #ffd700;
+            font-size: clamp(14px, 2.5vw, 24px);
+            font-weight: 600;
+            margin-top: clamp(12px, 2vh, 24px);
+        }
+        .meta {
+            color: #888;
+            font-size: clamp(12px, 2vw, 18px);
+            margin-bottom: clamp(8px, 1.5vh, 16px);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5em;
+            align-items: center;
+        }
+        .meta .category {
+            color: #7b9fff;
+            font-weight: 600;
+        }
+        .meta .value {
+            color: #ffd700;
+            font-weight: 700;
+        }
+        .meta .year {
+            color: #666;
+        }
+        .meta .daily-double {
+            background: #ffd700;
+            color: #0f0f1a;
+            padding: 0.1em 0.5em;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.9em;
+        }
+        .meta .sep {
+            color: #444;
+        }
+        .clue {
+            color: #fff;
+            font-size: clamp(20px, 5vw, 48px);
+            font-weight: 500;
+            line-height: 1.3;
+            word-wrap: break-word;
+        }
+        .clue a {
+            color: #7b9fff;
+            text-decoration: none;
+        }
+        .clue a:hover {
+            text-decoration: underline;
+        }
+        .sidebar {
+            width: clamp(120px, 20vw, 220px);
+            background: #1a1a2e;
+            border-radius: 8px;
+            padding: clamp(12px, 1.5vw, 20px);
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-title {
+            color: #7b9fff;
+            font-size: clamp(12px, 1.5vw, 16px);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: clamp(8px, 1vh, 16px);
+            padding-bottom: clamp(6px, 0.8vh, 12px);
+            border-bottom: 1px solid #2a2a4e;
+        }
+        .scores {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .score-row {
+            display: flex;
+            justify-content: space-between;
+            padding: clamp(4px, 0.6vh, 8px) 0;
+            font-size: clamp(12px, 1.5vw, 16px);
+        }
+        .score-row .name {
+            color: #ccc;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-right: 8px;
+        }
+        .score-row .points {
+            color: #ffd700;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .no-scores {
+            color: #555;
+            font-style: italic;
+            font-size: clamp(11px, 1.3vw, 14px);
+        }
+        .waiting {
+            color: #555;
+            font-size: clamp(16px, 3vw, 28px);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="main" id="main">
+            <div class="waiting">Waiting for game...</div>
+        </div>
+        <div class="sidebar">
+            <div class="sidebar-title">Scores</div>
+            <div class="scores" id="scores">
+                <div class="no-scores">No scores yet</div>
+            </div>
+        </div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const mainEl = document.getElementById("main");
+        const scoresEl = document.getElementById("scores");
+
+        function render(state) {
+            // Render main content
+            if (state.question) {
+                let html = "";
+                html += '<div class="meta">';
+                if (state.question.dailyDouble) {
+                    html += '<span class="daily-double">DAILY DOUBLE</span>';
+                }
+                html += '<span class="category">' + escapeHtml(state.question.category) + '</span>';
+                html += '<span class="sep">·</span>';
+                html += '<span class="value">' + escapeHtml(state.question.value) + '</span>';
+                if (state.question.year) {
+                    html += '<span class="sep">·</span>';
+                    html += '<span class="year">aired ' + state.question.year + '</span>';
+                }
+                html += '</div>';
+                html += '<div class="clue">' + linkifyUrls(state.question.clue) + '</div>';
+                if (state.message) {
+                    html += '<div class="message">' + escapeHtml(state.message) + '</div>';
+                }
+                mainEl.innerHTML = html;
+            } else {
+                mainEl.innerHTML = '<div class="waiting">Waiting for game...</div>';
+            }
+
+            // Render scoreboard
+            const entries = Object.entries(state.scoreboard || {}).sort((a, b) => b[1] - a[1]);
+            if (entries.length === 0) {
+                scoresEl.innerHTML = '<div class="no-scores">No scores yet</div>';
+            } else {
+                scoresEl.innerHTML = entries.map(([name, score]) =>
+                    '<div class="score-row"><span class="name">' + escapeHtml(name) + '</span><span class="points">' + score + '</span></div>'
+                ).join("");
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement("div");
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function linkifyUrls(text) {
+            const urlRegex = /(https?:\\/\\/[^\\s]+)/g;
+            return escapeHtml(text).replace(urlRegex, function(url) {
+                const lower = url.toLowerCase();
+                const isImage = /\\.(jpg|jpeg|png|gif|webp|svg|bmp)(\\?|$)/i.test(lower);
+                const isVideo = /\\.(mp4|webm|mov|avi|mkv)(\\?|$)/i.test(lower) ||
+                               /youtube\\.com|youtu\\.be|vimeo\\.com/i.test(lower);
+                const label = isVideo ? "Video" : "Image";
+                return '[<a href="' + url + '" target="_blank" rel="noopener">' + label + '</a>]';
+            });
+        }
+
+        socket.on("state", render);
+    </script>
+</body>
+</html>`
+
+app.get("/", (req, res) => {
+    res.send(dashboardHtml)
+})
+
+io.on("connection", (socket) => {
+    socket.emit("state", getDashboardState())
+})
+
+server.listen(3093, () => {
+    console.log("Jeopardy dashboard listening on port 3093")
+})
 
 // Round timeout - if no requests for this long, consider it a fresh round
 const ROUND_TIMEOUT_SECONDS = 300 // 5 minutes
@@ -36,11 +301,6 @@ function formatScoreboard(scores, isFinal = false) {
     const divider = "─".repeat(innerWidth)
 
     return "```\n" + label + "\n" + divider + "\n" + lines.join("\n") + "\n```"
-}
-
-// Strip HTML tags from clue text
-function stripHtml(str) {
-    return str.replace(/<[^>]*>/g, "").trim()
 }
 
 // Format a question for display
@@ -87,6 +347,9 @@ function handleTimeout() {
     firstGuessTime = null
 
     const prefix = `**Time is up!** The answer was: **${correctAnswer}**`
+    lastMessage = `Time is up! The answer was: ${correctAnswer}`
+    broadcastState()
+
     const fullText = buildQuestionMessage(currentQuestion, prefix)
     skittles.shout(lastChannel.guildId, lastChannel.channelId, fullText)
 }
@@ -145,6 +408,8 @@ const request = async (req, key, capture) => {
             }
             req.reply({ text: newRoundText })
             scoreboard = {}
+            lastMessage = "New round started!"
+            broadcastState()
         }
     }
     lastRequestTime = now
@@ -165,6 +430,7 @@ const request = async (req, key, capture) => {
         clearAnswerTimeout()
         const correctAnswer = bot.giveUp(currentQuestion.id)
         req.reply({ text: `The answer was: **${correctAnswer}**` })
+        lastMessage = `The answer was: ${correctAnswer}`
         currentQuestion = null
     }
 
@@ -178,6 +444,7 @@ const request = async (req, key, capture) => {
             scoreboard[req.nickname] = (scoreboard[req.nickname] || 0) + 1
 
             req.reply({ text: `# **Correct: ** ${result.answer}`, reply: true })
+            lastMessage = `${req.nickname} got it! ${result.answer}`
             currentQuestion = null
         } else {
             // Wrong answer - start timeout on first guess for this question
@@ -190,8 +457,10 @@ const request = async (req, key, capture) => {
 
     if (!currentQuestion) {
         currentQuestion = bot.getQuestion()
+        lastMessage = null
     }
 
+    broadcastState()
     return req.reply({ text: buildQuestionMessage(currentQuestion) })
 }
 
