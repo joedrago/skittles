@@ -262,8 +262,8 @@ io.on("connection", (socket) => {
     socket.emit("state", getDashboardState())
 })
 
-server.listen(3093, () => {
-    console.log("Jeopardy dashboard listening on port 3093")
+server.listen(3093, "127.0.0.1", () => {
+    console.log("Jeopardy dashboard listening on http://127.0.0.1:3093")
 })
 
 // Round timeout - if no requests for this long, consider it a fresh round
