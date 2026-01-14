@@ -458,6 +458,9 @@ const request = async (req, key, capture) => {
             const questionValue = parseValue(currentQuestion.value)
             scoreboard[req.nickname] = (scoreboard[req.nickname] || 0) + questionValue
 
+            // Always show the correct answer
+            req.reply({ text: `# **Correct: ** ${result.answer} (+${formatDollars(questionValue)})`, reply: true })
+
             // Check for winner
             if (scoreboard[req.nickname] >= WINNING_SCORE) {
                 req.reply({ text: `# 🎉🏆 ${req.nickname} wins with ${formatDollars(scoreboard[req.nickname])}! 🏆🎉` })
@@ -465,7 +468,6 @@ const request = async (req, key, capture) => {
                 lastMessage = `${req.nickname} wins the game with ${formatDollars(scoreboard[req.nickname])}!`
                 scoreboard = {}
             } else {
-                req.reply({ text: `# **Correct: ** ${result.answer} (+${formatDollars(questionValue)})`, reply: true })
                 lastMessage = `${req.nickname} got it! ${result.answer} (+${formatDollars(questionValue)})`
             }
             currentQuestion = null
