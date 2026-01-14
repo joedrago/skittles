@@ -448,6 +448,46 @@ const ordinalWords = {
 // Reverse ordinal mapping
 const ordinalDigits = Object.fromEntries(Object.entries(ordinalWords).map(([word, digit]) => [digit, word]))
 
+// Words that are too generic to count as partial answers - they must match the entire answer
+const TRIVIAL_WORDS = new Set([
+    // Articles
+    'a', 'an', 'the',
+    // Coordinating conjunctions
+    'and', 'but', 'or', 'for', 'nor', 'yet', 'so',
+    // Common short words
+    'it', 'is', 'be', 'to', 'of', 'in', 'on', 'at', 'by', 'as', 'if', 'do', 'go', 'no', 'up', 'us', 'we', 'he', 'me', 'my',
+    // Titles and honorifics (common category prefixes)
+    'king', 'queen', 'prince', 'princess', 'lord', 'lady', 'sir', 'dame',
+    'pope', 'saint', 'st',
+    'duke', 'duchess', 'earl', 'baron', 'count', 'countess',
+    'emperor', 'empress',
+    'general', 'admiral', 'colonel', 'major', 'captain', 'lieutenant',
+    'doctor', 'dr', 'mr', 'mrs', 'miss', 'ms',
+    // Geographic prefixes
+    'lake', 'mount', 'mt', 'river', 'sea', 'ocean', 'bay', 'gulf', 'cape', 'port', 'fort', 'isle', 'island',
+    'north', 'south', 'east', 'west', 'northern', 'southern', 'eastern', 'western',
+    'new', 'old', 'great', 'grand', 'little', 'big',
+    // Colors (common category prefixes like "Red Sea", "Black Forest")
+    'red', 'blue', 'green', 'black', 'white', 'yellow', 'orange', 'purple', 'pink', 'brown', 'gray', 'grey',
+    // Other common category words
+    'world', 'national', 'american', 'british', 'french', 'german', 'roman', 'ancient', 'modern',
+    'first', 'second', 'third', 'last',
+    'your', 'his', 'her', 'its', 'our', 'their', 'this', 'that', 'what', 'who', 'how', 'why', 'when', 'where'
+])
+
+// Minimum length for substring matching - shorter guesses must match whole words
+const MIN_SUBSTRING_LENGTH = 4
+
+/**
+ * Check if a word appears as a complete word in a string (not as a substring of another word)
+ */
+function isWholeWord(word, str) {
+    if (!word || !str) return false
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const regex = new RegExp(`\\b${escaped}\\b`, 'i')
+    return regex.test(str)
+}
+
 /**
  * Simple singularization - converts common plural forms to singular
  * Handles: -s, -es, -ies endings
@@ -584,6 +624,10 @@ function checkAnswer(userAnswer, correctAnswer) {
     // Exact match after basic normalization
     if (userBasic === correctBasic) return true
 
+    // Trivial words (articles, conjunctions, etc.) can only match if they ARE the entire answer
+    // Since we already checked exact match above, if user gave a trivial word it's wrong
+    if (TRIVIAL_WORDS.has(userBasic)) return false
+
     // Try with numbers as digits
     const userDigits = normalize(userAnswer)
     const correctDigits = normalize(correctAnswer)
@@ -601,8 +645,10 @@ function checkAnswer(userAnswer, correctAnswer) {
 
     // Check if singularized forms match via substring
     // e.g., "comics" -> "comic" is substring of "comic books" -> "comic book"
+    // For short answers, require whole-word matching to prevent gaming with short substrings
     if (correctSingular.length >= 3 && userSingular.includes(correctSingular)) return true
-    if (userSingular.length >= 3 && correctSingular.includes(userSingular)) return true
+    if (userSingular.length >= MIN_SUBSTRING_LENGTH && correctSingular.includes(userSingular)) return true
+    if (userSingular.length >= 3 && userSingular.length < MIN_SUBSTRING_LENGTH && isWholeWord(userSingular, correctSingular)) return true
 
     // For purely numerical answers (years, counts, quantities), require exact match
     // No fuzzy matching allowed - "1776" should not match "1876"
@@ -620,8 +666,13 @@ function checkAnswer(userAnswer, correctAnswer) {
         // User gave partial answer - must be a meaningful portion (>=40%) of the full answer
         // e.g., "stooges" for "the three stooges" (44%) - OK
         // e.g., "and" for "Lincoln and Jefferson" (16%) - NOT OK
+        // For short answers (< MIN_SUBSTRING_LENGTH), require whole-word matching
         const partialRatio = userDigits.length / correctDigits.length
-        if (userDigits.length >= 4 && partialRatio >= 0.4 && correctDigits.includes(userDigits)) {
+        if (userDigits.length >= MIN_SUBSTRING_LENGTH && partialRatio >= 0.4 && correctDigits.includes(userDigits)) {
+            return true
+        }
+        // Short answers (3 chars) can still match but only as whole words with stricter ratio
+        if (userDigits.length >= 3 && userDigits.length < MIN_SUBSTRING_LENGTH && partialRatio >= 0.4 && isWholeWord(userDigits, correctDigits)) {
             return true
         }
     }
@@ -652,5 +703,9 @@ module.exports = {
     damerauLevenshtein,
     isWithinEditDistance,
     doubleMetaphone,
-    phoneticMatch
+    phoneticMatch,
+    isWholeWord,
+    // Constants for answer validation
+    TRIVIAL_WORDS,
+    MIN_SUBSTRING_LENGTH
 }
