@@ -281,13 +281,14 @@ let firstGuessTime = null
 let timeoutTimer = null
 let lastChannel = null // { guildId, channelId }
 const ANSWER_TIMEOUT_MS = 30 * 1000
+const WINNING_SCORE = 20
 
 // Format the scoreboard for display (terse, sorted by score descending)
 function formatScoreboard(scores, isFinal = false) {
     const entries = Object.entries(scores).sort((a, b) => b[1] - a[1])
     if (entries.length === 0) return null
 
-    const label = isFinal ? "Final Scores" : "Scores"
+    const label = isFinal ? "Final Scores" : `Scores - First to ${WINNING_SCORE} wins!`
     const maxNameLen = Math.max(...entries.map(([name]) => name.length), 4)
     const maxScoreLen = Math.max(...entries.map(([, count]) => String(count).length), 1)
 
@@ -443,8 +444,16 @@ const request = async (req, key, capture) => {
             // Update scoreboard
             scoreboard[req.nickname] = (scoreboard[req.nickname] || 0) + 1
 
-            req.reply({ text: `# **Correct: ** ${result.answer}`, reply: true })
-            lastMessage = `${req.nickname} got it! ${result.answer}`
+            // Check for winner
+            if (scoreboard[req.nickname] >= WINNING_SCORE) {
+                req.reply({ text: `# 🎉🏆 ${req.nickname} wins! 🏆🎉` })
+                req.reply({ text: `Starting new game...` })
+                scoreboard = {}
+                lastMessage = `${req.nickname} wins the game!`
+            } else {
+                req.reply({ text: `# **Correct: ** ${result.answer}`, reply: true })
+                lastMessage = `${req.nickname} got it! ${result.answer}`
+            }
             currentQuestion = null
         } else {
             // Wrong answer - start timeout on first guess for this question
