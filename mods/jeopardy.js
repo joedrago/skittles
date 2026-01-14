@@ -17,6 +17,18 @@ function stripHtml(str) {
     return str.replace(/<[^>]*>/g, "").trim()
 }
 
+// Parse dollar value from question value string (e.g., "$200" -> 200)
+function parseValue(valueStr) {
+    if (!valueStr) return 0
+    const match = valueStr.replace(/,/g, "").match(/\d+/)
+    return match ? parseInt(match[0], 10) : 0
+}
+
+// Format a number as dollars with commas (e.g., 10000 -> "$10,000")
+function formatDollars(amount) {
+    return "$" + amount.toLocaleString()
+}
+
 // Build dashboard state object
 function getDashboardState() {
     let question = null
@@ -226,7 +238,7 @@ const dashboardHtml = `<!DOCTYPE html>
                 scoresEl.innerHTML = '<div class="no-scores">No scores yet</div>';
             } else {
                 scoresEl.innerHTML = entries.map(([name, score]) =>
-                    '<div class="score-row"><span class="name">' + escapeHtml(name) + '</span><span class="points">' + score + '</span></div>'
+                    '<div class="score-row"><span class="name">' + escapeHtml(name) + '</span><span class="points">$' + score.toLocaleString() + '</span></div>'
                 ).join("");
             }
         }
@@ -281,20 +293,21 @@ let firstGuessTime = null
 let timeoutTimer = null
 let lastChannel = null // { guildId, channelId }
 const ANSWER_TIMEOUT_MS = 30 * 1000
-const WINNING_SCORE = 20
+const WINNING_SCORE = 10000
 
 // Format the scoreboard for display (terse, sorted by score descending)
 function formatScoreboard(scores, isFinal = false) {
     const entries = Object.entries(scores).sort((a, b) => b[1] - a[1])
     if (entries.length === 0) return null
 
-    const label = isFinal ? "Final Scores" : `Scores - First to ${WINNING_SCORE} wins!`
+    const label = isFinal ? "Final Scores" : `Scores - First to ${formatDollars(WINNING_SCORE)} wins!`
     const maxNameLen = Math.max(...entries.map(([name]) => name.length), 4)
-    const maxScoreLen = Math.max(...entries.map(([, count]) => String(count).length), 1)
+    const formattedScores = entries.map(([, amount]) => formatDollars(amount))
+    const maxScoreLen = Math.max(...formattedScores.map(s => s.length), 1)
 
-    const lines = entries.map(([name, count]) => {
+    const lines = entries.map(([name, amount], i) => {
         const paddedName = name.padEnd(maxNameLen)
-        const paddedScore = String(count).padStart(maxScoreLen)
+        const paddedScore = formattedScores[i].padStart(maxScoreLen)
         return `${paddedName}  ${paddedScore}`
     })
 
@@ -441,18 +454,19 @@ const request = async (req, key, capture) => {
 
         if (result.correct) {
             clearAnswerTimeout()
-            // Update scoreboard
-            scoreboard[req.nickname] = (scoreboard[req.nickname] || 0) + 1
+            // Update scoreboard with question's dollar value
+            const questionValue = parseValue(currentQuestion.value)
+            scoreboard[req.nickname] = (scoreboard[req.nickname] || 0) + questionValue
 
             // Check for winner
             if (scoreboard[req.nickname] >= WINNING_SCORE) {
-                req.reply({ text: `# 🎉🏆 ${req.nickname} wins! 🏆🎉` })
+                req.reply({ text: `# 🎉🏆 ${req.nickname} wins with ${formatDollars(scoreboard[req.nickname])}! 🏆🎉` })
                 req.reply({ text: `Starting new game...` })
+                lastMessage = `${req.nickname} wins the game with ${formatDollars(scoreboard[req.nickname])}!`
                 scoreboard = {}
-                lastMessage = `${req.nickname} wins the game!`
             } else {
-                req.reply({ text: `# **Correct: ** ${result.answer}`, reply: true })
-                lastMessage = `${req.nickname} got it! ${result.answer}`
+                req.reply({ text: `# **Correct: ** ${result.answer} (+${formatDollars(questionValue)})`, reply: true })
+                lastMessage = `${req.nickname} got it! ${result.answer} (+${formatDollars(questionValue)})`
             }
             currentQuestion = null
         } else {
