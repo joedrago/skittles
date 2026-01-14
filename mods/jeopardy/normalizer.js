@@ -611,11 +611,89 @@ function isPurelyNumerical(str) {
 }
 
 /**
+ * Extract quoted strings from clue text
+ * Returns an array of lowercase quoted words/phrases
+ */
+function extractQuotedStrings(clueText) {
+    if (!clueText) return []
+    const results = []
+
+    // Match straight double quotes
+    const doubleQuotes = clueText.match(/"([^"]+)"/g)
+    if (doubleQuotes) {
+        for (const m of doubleQuotes) {
+            const inner = basicNormalize(m.slice(1, -1))
+            if (inner) results.push(inner)
+        }
+    }
+
+    // Match curly double quotes (Unicode)
+    const curlyQuotes = clueText.match(/\u201c([^\u201d]+)\u201d/g)
+    if (curlyQuotes) {
+        for (const m of curlyQuotes) {
+            const inner = basicNormalize(m.slice(1, -1))
+            if (inner) results.push(inner)
+        }
+    }
+
+    // Match single quotes (but be careful - these could be apostrophes)
+    // Only match if it looks like a quoted phrase (has spaces or is ALL CAPS)
+    const singleQuotes = clueText.match(/'([^']+)'/g)
+    if (singleQuotes) {
+        for (const m of singleQuotes) {
+            const inner = m.slice(1, -1)
+            // Only treat as quoted if it's ALL CAPS or contains a space
+            if (/^[A-Z\s]+$/.test(inner) || inner.includes(' ')) {
+                const normalized = basicNormalize(inner)
+                if (normalized) results.push(normalized)
+            }
+        }
+    }
+
+    return results
+}
+
+/**
+ * Check if the user's answer is just a quoted hint from the clue
+ * This prevents gaming by typing the quoted word from the question
+ */
+function isJustQuotedHint(userAnswer, clueText) {
+    if (!clueText) return false
+    const quotedStrings = extractQuotedStrings(clueText)
+    if (quotedStrings.length === 0) return false
+
+    const userNormalized = basicNormalize(userAnswer)
+
+    // Check if the user's answer exactly matches any quoted string from the clue
+    for (const quoted of quotedStrings) {
+        if (userNormalized === quoted) {
+            return true
+        }
+    }
+    return false
+}
+
+/**
  * Check if two answers match using flexible comparison
  * Returns true if the answers are considered equivalent
+ * @param {string} userAnswer - The user's answer
+ * @param {string} correctAnswer - The correct answer
+ * @param {string} [clueText] - Optional clue text to detect quoted hint gaming
  */
-function checkAnswer(userAnswer, correctAnswer) {
+function checkAnswer(userAnswer, correctAnswer, clueText) {
     if (!userAnswer || !correctAnswer) return false
+
+    // Check if user is just typing a quoted word from the clue
+    // This must be checked early, before substring matching could accept it
+    if (isJustQuotedHint(userAnswer, clueText)) {
+        // The user typed exactly what was quoted in the clue - reject this
+        // unless it's actually the complete correct answer
+        const userNormalized = basicNormalize(userAnswer)
+        const correctNormalized = basicNormalize(correctAnswer)
+        if (userNormalized !== correctNormalized) {
+            return false
+        }
+    }
 
     // Normalize both answers
     const userBasic = basicNormalize(userAnswer)
@@ -705,6 +783,9 @@ module.exports = {
     doubleMetaphone,
     phoneticMatch,
     isWholeWord,
+    // Quoted hint detection
+    extractQuotedStrings,
+    isJustQuotedHint,
     // Constants for answer validation
     TRIVIAL_WORDS,
     MIN_SUBSTRING_LENGTH

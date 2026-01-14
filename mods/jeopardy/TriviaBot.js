@@ -135,9 +135,9 @@ class TriviaBot {
 
         const fields = parseFields(row.flds)
 
-        // Mark as seen and cache the answer
+        // Mark as seen and cache the answer and clue
         this.seenIds.add(row.id)
-        this.answerCache.set(row.id, fields.answer)
+        this.answerCache.set(row.id, { answer: fields.answer, clue: fields.clue })
         this._saveCache()
 
         return {
@@ -159,24 +159,24 @@ class TriviaBot {
      * @returns {Object} { correct: boolean, correctAnswer?: string }
      */
     checkAnswer(questionId, userAnswer) {
-        const correctAnswer = this.answerCache.get(questionId)
+        const cached = this.answerCache.get(questionId)
 
-        if (!correctAnswer) {
+        if (!cached) {
             // Question not in cache, fetch from database
             const row = this.questionByIdStmt.get(questionId)
             if (!row) {
                 return { correct: false, error: "Question not found" }
             }
             const fields = parseFields(row.flds)
-            this.answerCache.set(questionId, fields.answer)
+            this.answerCache.set(questionId, { answer: fields.answer, clue: fields.clue })
             return {
-                correct: checkAnswer(userAnswer, fields.answer)
+                correct: checkAnswer(userAnswer, fields.answer, fields.clue)
             }
         }
 
         return {
-            correct: checkAnswer(userAnswer, correctAnswer),
-            answer: correctAnswer
+            correct: checkAnswer(userAnswer, cached.answer, cached.clue),
+            answer: cached.answer
         }
     }
 
@@ -186,17 +186,19 @@ class TriviaBot {
      * @returns {string|null} The correct answer or null if not found
      */
     giveUp(questionId) {
-        let answer = this.answerCache.get(questionId)
+        const cached = this.answerCache.get(questionId)
 
-        if (!answer) {
-            const row = this.questionByIdStmt.get(questionId)
-            if (row) {
-                const fields = parseFields(row.flds)
-                answer = fields.answer
-            }
+        if (cached) {
+            return cached.answer
         }
 
-        return answer || null
+        const row = this.questionByIdStmt.get(questionId)
+        if (row) {
+            const fields = parseFields(row.flds)
+            return fields.answer
+        }
+
+        return null
     }
 
     /**
