@@ -30,7 +30,7 @@ const request = async (req, key, capture) => {
 
     const words = text.split(/\s+/).filter(w => w.length > 0)
     if (!words.length) {
-        return req.reply({ text: "Syntax: `#morse TEXT`" })
+        return req.reply({ text: "This command requires text after the trigger." })
     }
 
     const encoded = words.map(word => {
